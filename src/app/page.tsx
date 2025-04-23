@@ -1,5 +1,3 @@
-/* eslint-disable @typescript-eslint/no-unused-vars */
-
 'use client';
 import React, { useState } from 'react';
 
@@ -9,10 +7,26 @@ export default function Home() {
   const [log, setLog] = useState<string[]>([]);
   const [mostrarIVA, setMostrarIVA] = useState(true);
   const [tipoFiltro, setTipoFiltro] = useState<'Todos' | 'B' | 'S'>('Todos');
+  const [fechaFiltro, setFechaFiltro] = useState('');
+  const [ordenTotal, setOrdenTotal] = useState<'none' | 'asc' | 'desc'>('none');
 
-  const filteredData = combinedData.filter(item =>
-    tipoFiltro === 'Todos' ? true : item.tipo === tipoFiltro
-  );
+  const filteredData = combinedData
+    .filter(item =>
+      tipoFiltro === 'Todos' ? true : item.tipo === tipoFiltro
+    )
+    .filter(item => {
+      if (!fechaFiltro) return true;
+      const xmlDate = item.fechaEmision?.substring(0, 10); // e.g. "2025-04-05"
+      const filtro = fechaFiltro.length === 7
+        ? xmlDate?.startsWith(fechaFiltro) // e.g. "2025-04"
+        : xmlDate === fechaFiltro;         // e.g. "2025-04-05"
+      return filtro;
+    })
+    .sort((a, b) => {
+      if (ordenTotal === 'asc') return parseFloat(a.total) - parseFloat(b.total);
+      if (ordenTotal === 'desc') return parseFloat(b.total) - parseFloat(a.total);
+      return 0;
+    });
 
   async function handleParse() {
     if (!files) return;
@@ -98,6 +112,30 @@ export default function Home() {
                 <option value="Todos">Todos</option>
                 <option value="B">Bienes (B)</option>
                 <option value="S">Servicios (S)</option>
+              </select>
+            </label>
+
+            <label className="inline-flex items-center gap-2">
+              Fecha emisión:
+              <input
+                type="text"
+                className="border rounded px-2 py-1"
+                placeholder="YYYY-MM o YYYY-MM-DD"
+                value={fechaFiltro}
+                onChange={e => setFechaFiltro(e.target.value)}
+              />
+            </label>
+
+            <label className="inline-flex items-center gap-2">
+              Ordenar por total:
+              <select
+                className="border rounded px-2 py-1"
+                value={ordenTotal}
+                onChange={e => setOrdenTotal(e.target.value as 'none' | 'asc' | 'desc')}
+              >
+                <option value="none">Sin orden</option>
+                <option value="asc">Menor a mayor</option>
+                <option value="desc">Mayor a menor</option>
               </select>
             </label>
           </div>
