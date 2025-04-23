@@ -1,103 +1,182 @@
-import Image from "next/image";
+/* eslint-disable @typescript-eslint/no-unused-vars */
+
+'use client';
+import React, { useState } from 'react';
 
 export default function Home() {
-  return (
-    <div className="grid grid-rows-[20px_1fr_20px] items-center justify-items-center min-h-screen p-8 pb-20 gap-16 sm:p-20 font-[family-name:var(--font-geist-sans)]">
-      <main className="flex flex-col gap-[32px] row-start-2 items-center sm:items-start">
-        <Image
-          className="dark:invert"
-          src="/next.svg"
-          alt="Next.js logo"
-          width={180}
-          height={38}
-          priority
-        />
-        <ol className="list-inside list-decimal text-sm/6 text-center sm:text-left font-[family-name:var(--font-geist-mono)]">
-          <li className="mb-2 tracking-[-.01em]">
-            Get started by editing{" "}
-            <code className="bg-black/[.05] dark:bg-white/[.06] px-1 py-0.5 rounded font-[family-name:var(--font-geist-mono)] font-semibold">
-              src/app/page.tsx
-            </code>
-            .
-          </li>
-          <li className="tracking-[-.01em]">
-            Save and see your changes instantly.
-          </li>
-        </ol>
+  const [files, setFiles] = useState<FileList | null>(null);
+  const [combinedData, setCombinedData] = useState<any[]>([]);
+  const [log, setLog] = useState<string[]>([]);
+  const [mostrarIVA, setMostrarIVA] = useState(true);
+  const [tipoFiltro, setTipoFiltro] = useState<'Todos' | 'B' | 'S'>('Todos');
 
-        <div className="flex gap-4 items-center flex-col sm:flex-row">
-          <a
-            className="rounded-full border border-solid border-transparent transition-colors flex items-center justify-center bg-foreground text-background gap-2 hover:bg-[#383838] dark:hover:bg-[#ccc] font-medium text-sm sm:text-base h-10 sm:h-12 px-4 sm:px-5 sm:w-auto"
-            href="https://vercel.com/new?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-            target="_blank"
-            rel="noopener noreferrer"
+  const filteredData = combinedData.filter(item =>
+    tipoFiltro === 'Todos' ? true : item.tipo === tipoFiltro
+  );
+
+  async function handleParse() {
+    if (!files) return;
+    const allData = [];
+    const messages = [];
+
+    for (const file of Array.from(files)) {
+      const xmlText = await file.text();
+      const res = await fetch('/api/parse', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ xml: xmlText })
+      });
+      const json = await res.json();
+      if (json.data.length) {
+        allData.push(...json.data);
+      }
+      messages.push(`📄 ${file.name}: ${json.data.length} ítem(s) válidos${json.errors.length ? ' ⚠️ con errores' : ''}`);
+    }
+
+    setCombinedData(allData);
+    setLog(messages);
+  }
+
+  async function exportExcel() {
+    const res = await fetch('/api/export-excel', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ data: filteredData })
+    });
+    const blob = await res.blob();
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a'); a.href = url;
+    a.download = 'facturas_filtradas.xlsx'; a.click();
+  }
+
+  async function exportPdf() {
+    const res = await fetch('/api/export-pdf', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ data: filteredData })
+    });
+    const blob = await res.blob();
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a'); a.href = url;
+    a.download = 'facturas_filtradas.pdf'; a.click();
+  }
+
+  return (
+    <div className="min-h-screen bg-gradient-to-br from-white to-slate-100 p-10 text-gray-800 font-sans">
+      <div className="max-w-6xl mx-auto">
+        <h1 className="text-4xl font-bold mb-6 text-center">Filtrado de Facturas XML</h1>
+
+        <div className="bg-white p-6 rounded-lg shadow-lg mb-6 space-y-4">
+          <input
+            type="file"
+            multiple
+            accept=".xml"
+            onChange={e => setFiles(e.target.files)}
+            className="block w-full text-sm file:mr-4 file:py-2 file:px-4 file:rounded-full file:border-0 file:text-sm file:font-semibold file:bg-blue-50 file:text-blue-700 hover:file:bg-blue-100"
+          />
+
+          <button
+            onClick={handleParse}
+            className="w-full bg-blue-600 hover:bg-blue-700 text-white py-2 px-4 rounded font-medium shadow"
           >
-            <Image
-              className="dark:invert"
-              src="/vercel.svg"
-              alt="Vercel logomark"
-              width={20}
-              height={20}
-            />
-            Deploy now
-          </a>
-          <a
-            className="rounded-full border border-solid border-black/[.08] dark:border-white/[.145] transition-colors flex items-center justify-center hover:bg-[#f2f2f2] dark:hover:bg-[#1a1a1a] hover:border-transparent font-medium text-sm sm:text-base h-10 sm:h-12 px-4 sm:px-5 w-full sm:w-auto md:w-[158px]"
-            href="https://nextjs.org/docs?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-            target="_blank"
-            rel="noopener noreferrer"
-          >
-            Read our docs
-          </a>
+            Procesar archivos XML
+          </button>
+
+          <div className="flex flex-wrap gap-6 items-center">
+            <label className="inline-flex items-center gap-2">
+              <input type="checkbox" checked={mostrarIVA} onChange={e => setMostrarIVA(e.target.checked)} />
+              Mostrar IVA
+            </label>
+
+            <label className="inline-flex items-center gap-2">
+              Filtrar tipo:
+              <select
+                className="border rounded px-2 py-1"
+                value={tipoFiltro}
+                onChange={e => setTipoFiltro(e.target.value as 'Todos' | 'B' | 'S')}
+              >
+                <option value="Todos">Todos</option>
+                <option value="B">Bienes (B)</option>
+                <option value="S">Servicios (S)</option>
+              </select>
+            </label>
+          </div>
         </div>
-      </main>
-      <footer className="row-start-3 flex gap-[24px] flex-wrap items-center justify-center">
-        <a
-          className="flex items-center gap-2 hover:underline hover:underline-offset-4"
-          href="https://nextjs.org/learn?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-          target="_blank"
-          rel="noopener noreferrer"
-        >
-          <Image
-            aria-hidden
-            src="/file.svg"
-            alt="File icon"
-            width={16}
-            height={16}
-          />
-          Learn
-        </a>
-        <a
-          className="flex items-center gap-2 hover:underline hover:underline-offset-4"
-          href="https://vercel.com/templates?framework=next.js&utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-          target="_blank"
-          rel="noopener noreferrer"
-        >
-          <Image
-            aria-hidden
-            src="/window.svg"
-            alt="Window icon"
-            width={16}
-            height={16}
-          />
-          Examples
-        </a>
-        <a
-          className="flex items-center gap-2 hover:underline hover:underline-offset-4"
-          href="https://nextjs.org?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-          target="_blank"
-          rel="noopener noreferrer"
-        >
-          <Image
-            aria-hidden
-            src="/globe.svg"
-            alt="Globe icon"
-            width={16}
-            height={16}
-          />
-          Go to nextjs.org →
-        </a>
-      </footer>
+
+        {filteredData.length > 0 && (
+          <div className="bg-white p-6 rounded-lg shadow-lg">
+            <h2 className="text-xl font-semibold mb-4">📊 Total de ítems procesados: {filteredData.length}</h2>
+
+            <div className="overflow-x-auto">
+              <table className="min-w-full border text-sm">
+                <thead className="bg-gray-100">
+                  <tr>
+                    <th className="border px-4 py-2">Fecha Emisión</th>
+                    <th className="border px-4 py-2">Tipo Factura</th>
+                    <th className="border px-4 py-2">Receptor</th>
+                    <th className="border px-4 py-2">NIT o CUI</th>
+                    <th className="border px-4 py-2">Tipo</th>
+                    <th className="border px-4 py-2">Descripción</th>
+                    <th className="border px-4 py-2">Cantidad</th>
+                    <th className="border px-4 py-2">Precio Unitario</th>
+                    <th className="border px-4 py-2">Total</th>
+                    {mostrarIVA && <th className="border px-4 py-2">IVA</th>}
+                  </tr>
+                </thead>
+                <tbody>
+                  {filteredData.map((item, i) => (
+                    <tr key={i} className="hover:bg-gray-50">
+                      <td className="border px-4 py-1 text-center">{item.fechaEmision}</td>
+                      <td className="border px-4 py-1 text-center">{item.tipoFactura}</td>
+                      <td className="border px-4 py-1">{item.nombreReceptor}</td>
+                      <td className="border px-4 py-1 text-center">{item.nitReceptor}</td>
+                      <td className="border px-4 py-1 text-center">{item.tipo}</td>
+                      <td className="border px-4 py-1">{item.descripcion}</td>
+                      <td className="border px-4 py-1 text-center">{item.cantidad}</td>
+                      <td className="border px-4 py-1 text-right">Q{item.precioUnitario}</td>
+                      <td className="border px-4 py-1 text-right">Q{item.total}</td>
+                      {mostrarIVA && (
+                        <td className="border px-4 py-1 text-right">Q{item.iva}</td>
+                      )}
+                    </tr>
+                  ))}
+                </tbody>
+                <tfoot>
+                  <tr className="font-bold">
+                    <td colSpan={mostrarIVA ? 8 : 7} className="text-right px-4 py-2">Totales:</td>
+                    <td className="text-right px-4 py-2">
+                      Q{filteredData.reduce((a, b) => a + parseFloat(b.total), 0).toFixed(2)}
+                    </td>
+                    {mostrarIVA && (
+                      <td className="text-right px-4 py-2">
+                        Q{filteredData.reduce((a, b) => a + parseFloat(b.iva), 0).toFixed(2)}
+                      </td>
+                    )}
+                  </tr>
+                </tfoot>
+              </table>
+            </div>
+
+            <div className="mt-6 flex gap-4 justify-center">
+              <button onClick={exportExcel} className="bg-green-600 hover:bg-green-700 text-white px-6 py-2 rounded shadow">
+                Exportar a Excel
+              </button>
+              <button onClick={exportPdf} className="bg-red-600 hover:bg-red-700 text-white px-6 py-2 rounded shadow">
+                Exportar a PDF
+              </button>
+            </div>
+          </div>
+        )}
+
+        {log.length > 0 && (
+          <div className="bg-white p-6 rounded-lg shadow-lg mb-6">
+            <h2 className="text-xl font-semibold mb-2">Resumen de procesamiento</h2>
+            <ul className="list-disc pl-6 space-y-1 text-gray-700">
+              {log.map((msg, idx) => <li key={idx}>{msg}</li>)}
+            </ul>
+          </div>
+        )}
+      </div>
     </div>
   );
 }

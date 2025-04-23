@@ -1,0 +1,14 @@
+T__0=1
+OPEN=2
+CLOSE=3
+END_OPEN=4
+SLASH_CLOSE=5
+NAME=6
+STRING=7
+TEXT=8
+WS=9
+'='=1
+'<'=2
+'>'=3
+'</'=4
+'/>'=5
