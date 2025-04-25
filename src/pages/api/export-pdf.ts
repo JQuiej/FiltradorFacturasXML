@@ -45,21 +45,27 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     doc.fontSize(9).font('Helvetica-Bold');
     let x = startX;
     headers.forEach((header, i) => {
-      doc.text(header, x + 5, y, { width: colWidths[i] - 10, align: 'center' });
+      const paddingY = 5;
+      doc.text(header, x + 5, y + paddingY, { width: colWidths[i] - 10, align: 'center' });
       x += colWidths[i];
     });
 
-    y += 24;
-    doc.moveTo(startX, y).lineTo(startX + colWidths.reduce((a, b) => a + b), y).stroke();
+    const headerBottomY = y + 24;
 
-    const verticals = colWidths.reduce((acc, w, i) => {
-      const last = acc[acc.length - 1] ?? startX;
-      return [...acc, last + w];
-    }, [] as number[]);
-    verticals.forEach(xPos => {
-      doc.moveTo(xPos, y - 24).lineTo(xPos, y).stroke();
-    });
+    // Dibujar bordes de cada celda de encabezado
+    let cx = startX;
+    for (let i = 0; i < colWidths.length; i++) {
+      doc
+        .moveTo(cx, y)
+        .lineTo(cx + colWidths[i], y)
+        .lineTo(cx + colWidths[i], headerBottomY)
+        .lineTo(cx, headerBottomY)
+        .lineTo(cx, y)
+        .stroke();
+      cx += colWidths[i];
+    }
 
+    y = headerBottomY;
     doc.font('Helvetica').fontSize(8);
   };
 
@@ -71,11 +77,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
   drawHeader();
 
   const tableLeft = startX;
-  const tableRight = tableLeft + colWidths.reduce((a, b) => a + b);
-  const verticals = colWidths.reduce((acc, w, i) => {
-    const last = acc[acc.length - 1] ?? startX;
-    return [...acc, last + w];
-  }, [] as number[]);
+  const tableRight = tableLeft + colWidths.reduce((a, b) => a + b, 0);
 
   data.forEach((item: any) => {
     const row = [
@@ -106,8 +108,8 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     }
 
     let cx = startX;
-    row.forEach((cell, i) => {
-      const cellText = cell.toString();
+    for (let i = 0; i < row.length; i++) {
+      const cellText = row[i].toString();
       const textHeight = doc.heightOfString(cellText, { width: colWidths[i] - 10 });
       const paddingY = (rowHeight - textHeight) / 2;
       doc.text(cellText, cx + 5, y + paddingY, {
@@ -115,13 +117,22 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
         align: i === 5 ? 'left' : 'center',
       });
       cx += colWidths[i];
-    });
+    }
+
+    // Dibujar bordes de cada celda de la fila
+    cx = startX;
+    for (let i = 0; i < colWidths.length; i++) {
+      doc
+        .moveTo(cx, y)
+        .lineTo(cx + colWidths[i], y)
+        .lineTo(cx + colWidths[i], y + rowHeight)
+        .lineTo(cx, y + rowHeight)
+        .lineTo(cx, y)
+        .stroke();
+      cx += colWidths[i];
+    }
 
     y += rowHeight;
-    doc.moveTo(startX, y).lineTo(tableRight, y).stroke();
-    verticals.forEach(xPos => {
-      doc.moveTo(xPos, y - rowHeight).lineTo(xPos, y).stroke();
-    });
   });
 
   const total = data.reduce((acc: number, item: { total: string }) => acc + parseFloat(item.total), 0);
